@@ -1,0 +1,1 @@
+This is a dummy file placed solely to cheat tests (because Elasticache is a pro feature in Localstack, and we don't have that yet). See the [real_examples folder](../../real_examples/) for actual examples.
