@@ -56,7 +56,7 @@ resource "aws_security_group_rule" "these" {
 resource "aws_elasticache_cluster" "memcached" {
   count = var.engine == "memcached" ? 1 : 0
 
-  cluster_id                 = local.name
+  cluster_id                 = "/applications/${var.application_name}/${local.name}"
   engine                     = "memcached"
   engine_version             = var.engine_version
   node_type                  = var.node_type
@@ -85,7 +85,7 @@ resource "aws_elasticache_cluster" "memcached" {
 resource "aws_elasticache_cluster" "redis" {
   count = var.engine == "redis" ? 1 : 0
 
-  cluster_id                 = local.name
+  cluster_id                 = "/applications/${var.application_name}/${local.name}"
   engine                     = "redis"
   engine_version             = var.engine_version
   node_type                  = var.node_type
