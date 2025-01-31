@@ -172,9 +172,14 @@ variable "parameters" {
 }
 
 variable "ip_discovery" {
-  description = "Whether to enable IP discovery"
+  description = "The IP version to advertise in the discovery protocol"
   type        = string
   default     = "ipv4"
+
+  validation {
+    condition     = contains(["ipv4", "ipv6"], var.ip_discovery)
+    error_message = "ip_discovery must be either 'ipv4' or 'ipv6'"
+  }
 }
 
 variable "network_type" {
