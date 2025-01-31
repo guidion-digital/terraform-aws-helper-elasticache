@@ -3,7 +3,7 @@ module "these_tags" {
   version = "0.25.0"
 
   namespace = var.project
-  name      = var.application_name
+  name      = local.name
   delimiter = "-"
 
   tags = {
@@ -17,7 +17,7 @@ module "these_tags" {
 }
 
 resource "aws_elasticache_parameter_group" "this" {
-  name   = "${var.engine}-${var.application_name}-cache-params"
+  name   = "${local.name}-${var.engine}"
   family = "${var.engine}${join(".", slice(split(".", var.engine_version), 0, 2))}"
 
   dynamic "parameter" {
@@ -30,15 +30,15 @@ resource "aws_elasticache_parameter_group" "this" {
 }
 
 resource "aws_elasticache_subnet_group" "this" {
-  name        = "${var.application_name}-${var.engine}"
-  description = "Used within the ${var.application_name} ${var.engine} cluster"
+  name        = "${local.name}-${var.engine}"
+  description = "Used within the ${local.name} ${var.engine} cluster"
   subnet_ids  = var.subnet_ids
   tags        = module.these_tags.tags
 }
 
 resource "aws_security_group" "this" {
-  name        = "${var.application_name}-${var.engine}"
-  description = "Used within the ${var.application_name} ${var.engine} cluster"
+  name        = "${local.name}-${var.engine}"
+  description = "Used within the ${local.name} ${var.engine} cluster"
   vpc_id      = var.vpc_id
 }
 
