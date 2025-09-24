@@ -6,20 +6,20 @@ module "memcached" {
   stage            = "dev"
 
   engine         = "memcached"
-  engine_version = "1.6.16"
+  engine_version = "1.6.17"
   node_type      = "cache.t3.micro"
 
   # Use 'availablity_zone' if az_mode is 'single-az'
   az_mode                      = "cross-az"
   preferred_availability_zones = ["eu-central-1a", "eu-central-1b"]
 
-  vpc_id     = "vpc-0dfab25adab0ea4d5"
-  subnet_ids = ["subnet-0c778aad2e6e3b88b", "subnet-0a5208d551253a002", "subnet-0720e2396dc948d72"]
+  vpc_id     = "vpc-0e2c8dacf04f80915"
+  subnet_ids = ["subnet-01c97996cb4fb3ac8", "subnet-093bd49986fbbdf89", "subnet-044c17047e72dc07d"]
 
   parameters = [
     {
-      name  = "maxmemory-policy"
-      value = "noeviction"
+      name  = "chunk_size"
+      value = "1024"
     }
   ]
 
@@ -50,4 +50,28 @@ module "memcached" {
 
 output "memcached_address" {
   value = module.memcached.cluster_address
+}
+
+module "elasticache" {
+  source = "../../"
+
+  project                    = "constr"
+  application_name           = "test"
+  stage                      = "acc"
+  name                       = "testing"
+  engine                     = "redis"
+  engine_version             = "7.1"
+  node_type                  = "cache.t3.micro"
+  az_mode                    = "single-az"
+  transit_encryption_enabled = false
+  num_cache_nodes            = 1
+  vpc_id                     = "vpc-0e2c8dacf04f80915"
+  subnet_ids                 = ["subnet-01c97996cb4fb3ac8", "subnet-093bd49986fbbdf89", "subnet-044c17047e72dc07d"]
+
+  parameters = [
+    {
+      name  = "maxmemory-policy"
+      value = "noeviction"
+    }
+  ]
 }

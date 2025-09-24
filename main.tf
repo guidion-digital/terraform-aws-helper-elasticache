@@ -85,7 +85,6 @@ resource "aws_elasticache_cluster" "memcached" {
   tags = module.these_tags.tags
 }
 
-# This has not been tested, and only here to avoid refactoring outputs later
 resource "aws_elasticache_cluster" "redis" {
   count = var.engine == "redis" ? 1 : 0
 
@@ -97,4 +96,17 @@ resource "aws_elasticache_cluster" "redis" {
   maintenance_window         = var.maintenance_window
   transit_encryption_enabled = local.transit_encryption_enabled
   parameter_group_name       = aws_elasticache_parameter_group.this.name
+  auto_minor_version_upgrade = var.auto_minor_version_upgrade
+  network_type               = var.network_type
+  port                       = local.port
+  ip_discovery               = var.ip_discovery
+  notification_topic_arn     = var.notification_topic_arn
+
+  security_group_ids = concat(var.security_group_ids, [aws_security_group.this.id])
+  subnet_group_name  = aws_elasticache_subnet_group.this.name
+
+  num_cache_nodes   = local.num_cache_nodes
+  availability_zone = var.availability_zone
+
+  tags = module.these_tags.tags
 }
