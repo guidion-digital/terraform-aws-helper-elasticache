@@ -16,9 +16,13 @@ module "these_tags" {
   }
 }
 
+locals {
+  parameter_group_family = var.engine == "redis" ? "redis${split(".", var.engine_version)[0]}" : "${var.engine}${join(".", slice(split(".", var.engine_version), 0, min(2, length(split(".", var.engine_version)))))}"
+}
+
 resource "aws_elasticache_parameter_group" "this" {
   name   = "${local.name}-${var.engine}"
-  family = "${var.engine}${join(".", slice(split(".", var.engine_version), 0, min(2, length(split(".", var.engine_version)))))}"
+  family = local.parameter_group_family
 
   dynamic "parameter" {
     for_each = var.parameters
