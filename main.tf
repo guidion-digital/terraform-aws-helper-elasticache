@@ -18,7 +18,7 @@ module "these_tags" {
 
 resource "aws_elasticache_parameter_group" "this" {
   name   = "${local.name}-${var.engine}"
-  family = "${var.engine}${join(".", slice(split(".", var.engine_version), 0, 2))}"
+  family = "${var.engine}${join(".", slice(split(".", var.engine_version), 0, min(2, length(split(".", var.engine_version)))))}"
 
   dynamic "parameter" {
     for_each = var.parameters
