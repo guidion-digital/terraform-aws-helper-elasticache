@@ -1,0 +1,11 @@
+name: Testing ministack
+
+on:
+  push:
+    branches: [chore/bootstrap-ai-context]
+
+jobs:
+  tests-apply:
+    uses: guidion-digital/terrappy/.github/workflows/tfc-test-helper-module-apply.yaml@ministack
+    with:
+      environment_name: "localstack"
