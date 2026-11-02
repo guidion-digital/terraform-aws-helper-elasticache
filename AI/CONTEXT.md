@@ -1,5 +1,5 @@
 ---
-repo: terraform-aws-helper-elasticache
+repo: guidion-digital/terraform-aws-helper-elasticache
 project_name: Helper ElastiCache (Terrappy framework)
 owner: Cinfra
 domain: infrastructure
@@ -15,9 +15,9 @@ main_systems:
   - Terraform Registry
   - Terrappy (guidion-digital/terrappy)
   - LocalStack (CI only, effectively bypassed)
-last_reviewed: 2026-10-20
+last_reviewed: 2026-11-02
 review_confidence: low
-generated_by: AI-assisted
+generated_by: CI-generated
 validated_by: none
 ---
 
@@ -29,7 +29,7 @@ A small, flat Terraform module (no submodules) that turns a handful of inputs in
 
 - **Owner:** Cinfra (the GitHub `project-team` repo property is `cinfra`)
 - **Main stack:** Terraform/HCL, AWS ElastiCache, GitHub Actions
-- **Environment:** Whatever AWS account/region the consuming module runs in. The only concrete environment in this repo is `real_examples/test_app/main.tf`, which targets `eu-central-1` (`eu-central-1a`, `eu-central-1b`) in `vpc-0e2c8dacf04f80915`.
+- **Environment:** Whatever AWS account/region the consuming module runs in. CI uses `examples/test_app` with the LocalStack-targeted Terrappy workflow, but the example does not exercise ElastiCache because that service requires LocalStack Pro.
 
 ---
 
@@ -97,7 +97,7 @@ This is a Terraform module; its interface is its variables and outputs.
 | Output `arn`                    | ARN of the created cluster                                                                                                                      | Terrappy app modules / shared-resources |
 | Output `engine_version_actual`  | Running engine version after AWS patch resolution                                                                                               | Same                                    |
 | Output `cache_nodes`            | List of node objects (`id`, `address`, `port`, `availability_zone`) — the only way to get a Redis endpoint                                      | Same                                    |
-| Output `cluster_address`        | Memcached DNS name without port; `null` for Redis                                                                                               | Same; used by `real_examples`           |
+| Output `cluster_address`        | Memcached DNS name without port; `null` for Redis                                                                                               | Same                                    |
 | Output `configuration_endpoint` | Memcached discovery endpoint; for Redis returns the Redis attribute (null for a single-node cluster) despite the "(Memcached only)" description | Same                                    |
 | Output `tags_all`               | Tags including provider `default_tags`                                                                                                          | Same                                    |
 | Inputs (`variables.tf`)         | See "Module interface contract and consumer inventory"                                                                                          | Same                                    |
@@ -170,7 +170,7 @@ All three default `vpc_id` / `subnet_ids` to their own `module.vpc[0]` outputs (
 
 ## Deployment
 
-**CI/CD:** GitHub Actions, entirely via reusable workflows. `test-plan.yaml` runs on PRs to `acc`: `github-test-workflow.yaml@v2` → terrappy `tfc-test-helper-module-plan.yaml@v1` → `github-release-tag-dry-run.yaml@v2`. `test-apply-and-release.yaml` runs on push to `acc`: terrappy `tfc-test-helper-module-apply.yaml@v1` (`environment_name: "localstack"`), then either `workflow-change` (no `.tf` changed: merge `acc` → `master` without a release) or `terraform-module-change` + `release-module-version` (apply succeeded: merge `acc` → `master`, then `mathieudutour/github-tag-action@v6.2` bumps the tag and `ncipollo/release-action` creates a GitHub Release).
+**CI/CD:** GitHub Actions, entirely via reusable workflows. `test-plan.yaml` runs on PRs to `acc`: `github-test-workflow.yaml@v2` → terrappy `tfc-test-helper-module-plan.yaml@v1` → `github-release-tag-dry-run.yaml@v2`. `test-apply-and-release.yaml` runs on push to `acc`: terrappy `tfc-test-helper-module-apply.yaml@v1` (`environment_name: "localstack"`), then either `workflow-change` (no `.tf` changed: merge `acc` → `master` without a release) or `terraform-module-change` + `release-module-version` (apply succeeded: merge `acc` → `master`, then `mathieudutour/github-tag-action@v6.2` bumps the tag and `ncipollo/release-action` creates a GitHub Release). The workflow's reusable-workflow output references were updated for ministack in `a26928c`.
 
 **Infra:** Nothing is deployed from this repo. Releases are git tags (no prefix, e.g. `0.0.7`) picked up by the Terraform Registry. Consumers apply the module from their own workspaces.
 
@@ -179,7 +179,7 @@ All three default `vpc_id` / `subnet_ids` to their own `module.vpc[0]` outputs (
 **Environments:**
 
 - CI: LocalStack only, and only against `examples/test_app` (a stub — see Known risks).
-- Manual: `real_examples/test_app/main.tf` (Memcached `1.6.17` cross-az + Redis `7.1` single-az) against `vpc-0e2c8dacf04f80915` / `subnet-01c97996cb4fb3ac8`, `subnet-093bd49986fbbdf89`, `subnet-044c17047e72dc07d` in `eu-central-1`. State and lock files from local runs exist in the working tree but are untracked/ignored.
+- Manual: no real-AWS example is currently tracked in the repository.
 - Production: whatever accounts the consuming modules deploy to; not visible from this repo.
 
 ---
@@ -191,7 +191,7 @@ All three default `vpc_id` / `subnet_ids` to their own `module.vpc[0]` outputs (
 - **Network access defaults to "anything in the VPC".** With no `allowed_cidrs`/`security_group_rules`, ingress is opened on the engine port from the VPC's primary CIDR. This is the intended convenience default for Terrappy apps whose Lambdas sit in the same VPC.
 - **Names are not namespaced by project or stage.** `cluster_id = local.name` after the `/applications/...` attempt was reverted (`46dc370`). Isolation between stages therefore relies on stages living in different AWS accounts/regions, or on callers putting the stage into `name`.
 - **No `terraform {}` / `required_providers` block.** Provider version is entirely the caller's choice. Only the label module is pinned (`0.25.0`).
-- **CI cannot test the module.** ElastiCache is a LocalStack Pro feature that Guidion does not have, so `examples/test_app` was deliberately reduced to a comment so that terrappy's mandatory plan/apply jobs pass. Real usage examples live in `real_examples/`, which no workflow reads.
+- **CI cannot test the module.** ElastiCache is a LocalStack Pro feature that Guidion does not have, so `examples/test_app` was deliberately reduced to a comment so that terrappy's mandatory plan/apply jobs pass. No real-account example is currently tracked.
 
 ---
 
@@ -202,13 +202,12 @@ All three default `vpc_id` / `subnet_ids` to their own `module.vpc[0]` outputs (
 - **Redis clusters from this module cannot have in-transit encryption (by AWS design, silently).** The `var.engine == "memcached"` term in `local.transit_encryption_enabled` is correct and necessary: AWS supports TLS for Redis/Valkey only on replication groups, and `CreateCacheCluster` rejects it (`InvalidParameterCombination: Encryption feature is not supported for engine REDIS`). AWS provider ≥ 6.62.0 rejects it at plan time. Without the term, every Redis caller would fail, because the input defaults to `true`. The only weakness is that a Redis caller's `true` is dropped without warning, rather than rejected. Redis TLS (and AUTH) would need `aws_elasticache_replication_group`. Together with the VPC-wide default ingress, Redis traffic from this module is plaintext and unauthenticated inside the VPC.
 - **`6.x` breaks plan for Redis.** The provider accepts `6.x` as a Redis version, but `tonumber("6x")` errors because the local is evaluated for every engine. Fails closed; Redis 6 is broken anyway by the parameter-group family (above).
 - **`cross-az` with Redis fails at apply.** `local.num_cache_nodes` bumps to 2 for `cross-az` regardless of engine; Redis requires 1. `az_mode` itself is not passed to the Redis resource. Fails closed.
-- **Access-control comment in `real_examples/test_app/main.tf` is partly wrong.** The comment correctly says the VPC CIDR has access by default, and that `security_group_rules` or `allowed_cidrs` on its own replaces that default. It is wrong in two places. First, it claims the default is "overridden if any of these methods are used", but `security_group_ids` only attaches extra SGs and leaves the module SG's VPC-CIDR rule in place. Because SGs combine as a union, a caller who adds `security_group_ids` expecting to restrict access keeps VPC-wide access (fails open). Second, it claims the methods "are all cumulative", but when `security_group_rules` is set, `allowed_cidrs` is silently discarded, so those CIDRs lose access (fails closed). The commented `security_group_rules` sample uses `cidr_blocks = ["0.0.0.0/0"]`.
+- **Security-group inputs have non-cumulative behavior.** `security_group_ids` only attaches extra SGs and leaves the module SG's VPC-CIDR rule in place. Because SGs combine as a union, a caller who adds `security_group_ids` expecting to restrict access keeps VPC-wide access (fails open). When `security_group_rules` is set, `allowed_cidrs` is silently discarded, so those CIDRs lose access (fails closed).
 - **Default ingress covers only the VPC's primary CIDR.** Hosts in secondary VPC CIDRs, or reaching the cache through Transit Gateway/peering, are blocked unless `allowed_cidrs` or `security_group_rules` is set. Fails closed.
 - **Engine major upgrades likely need manual intervention (unverified).** The parameter group has a fixed name and no `create_before_destroy`; a family change (e.g. Memcached 1.6 → future 1.7, Redis 7 → 8) forces replacement of a group that is still attached to the cluster and has the same name. Expect a failed apply or a destroy/recreate sequence; test before attempting.
 - **Stage collisions within one account/region.** Because neither `project` nor `stage` is in any name, two consumers (or two stages) using the same `name` in the same account and region collide on `cluster_id` and on the `${name}-${engine}` SG/subnet/parameter group names. Harmless if every stage has its own account; a real collision otherwise.
-- **Labels that disagree with the wiring.** Tag `service = "memcached"` is hardcoded and also applied to Redis clusters. The `engine` description claims Memcached-only. The `configuration_endpoint` output is described as Memcached-only but returns the Redis attribute. The README links `./examples/example/main.tf`, which does not exist (the real example is `real_examples/test_app/main.tf`). The parameter group and security group get no tags at all.
+- **Labels that disagree with the wiring.** Tag `service = "memcached"` is hardcoded and also applied to Redis clusters. The `engine` description claims Memcached-only. The `configuration_endpoint` output is described as Memcached-only but returns the Redis attribute. The README links `./examples/example/main.tf`, which does not exist. The parameter group and security group get no tags at all.
 - **No provider version constraint.** Arguments such as `ip_discovery` and `network_type` need a reasonably recent AWS provider; a consumer on an old provider gets an unsupported-argument error rather than a clear constraint failure.
-- **Hardcoded example identifiers will drift.** `vpc-0e2c8dacf04f80915` and the three subnet IDs in `real_examples/test_app/main.tf` are literal; if that VPC is recreated the example breaks silently until someone runs it.
 
 ---
 
@@ -218,8 +217,8 @@ When modifying this repo:
 
 - Treat every variable, output, resource address (`memcached`, `redis`, `this`, `these`) and name pattern as a published interface consumed from the Terraform Registry by three Guidion modules. Renames, type changes and new required inputs are breaking; resource-name changes replace live caches.
 - Do not change `cluster_id = local.name` or the `${local.name}-${var.engine}` pattern without a migration plan; `cluster_id` cannot contain `/`.
-- Do not trust green CI. Before proposing a merge, run `terraform init && terraform plan` (and ideally apply/destroy) in `real_examples/test_app` against a real account, and say whether you did.
-- Do not put new examples in `examples/` — anything there is applied against LocalStack, where ElastiCache is unavailable. Use `real_examples/`.
+- Do not trust green CI. Before proposing a merge, run `terraform init && terraform plan` (and ideally apply/destroy) against a real account using a temporary root module, and say whether you did.
+- Do not put ElastiCache examples in `examples/` without changing the CI strategy — anything there is applied against LocalStack, where ElastiCache is unavailable.
 - When touching engine/version logic, test expressions with `terraform console` against at least `1.6.6`, `1.6.17`, `1.7.0`, `6.2`, `6.x` and `7.1` before claiming they work. Check the AWS provider's own `engine_version` validation (`internal/service/elasticache/engine_version.go`) before calling an input "valid".
 - Keep fixes fail-closed: prefer validation errors over silently ignoring inputs (as happens today with `allowed_cidrs` and Redis `transit_encryption_enabled`).
 - Use Conventional Commit subjects (`feat:`, `fix:`, `chore:`); the release workflow derives the version bump from them.
@@ -244,10 +243,10 @@ No roadmap is recorded in the repo. Open items implied by the code and history (
 
 ## Freshness
 
-- **Last reviewed:** 2026-10-20
+- **Last reviewed:** 2026-11-02
 - **Review confidence:** low
-- **Generated by:** AI-assisted
+- **Generated by:** CI-generated
 - **Validated by:** none
 - **Update when:** integrations change, stack changes, exposed APIs change, data ownership changes, or a relevant architectural decision is made
 
-First-generation bootstrap. Every tracked file in the repo (12 files) was read in full: `main.tf`, `variables.tf`, `outputs.tf`, `README.md`, both `examples/test_app` files, both `real_examples/test_app` files, both workflows, `.gitignore`, `.detect-secrets.baseline`. The repo is smaller than the playbook's 20-file coverage floor, so external sources were also read in full: terrappy's `tfc-test-helper-module-plan.yaml@v1` and `tfc-test-helper-module-apply.yaml@v1`, release-workflows' `github-release-tag.yaml@v2`, and the ElastiCache module blocks of all three consumers. Release-workflows' merge, dry-run and test workflows were characterised by name only. Version-handling expressions were evaluated in `terraform console` (Terraform 1.6.1), Redis TLS support was checked against the AWS in-transit encryption guide and provider PR #49114 (released in 6.62.0). The provider docs between 5.95.0 and 6.62.0 wrongly said standalone Redis clusters support TLS, so do not rely on those versions' docs. AWS parameter-group family names (`redis6.x`, `redis5.0`) come from AWS documentation and were not queried or applied live. Confidence stays `low` because no human has validated this draft.
+First-generation bootstrap. Every tracked implementation file present at the time was read in full: `main.tf`, `variables.tf`, `outputs.tf`, `README.md`, both `examples/test_app` files, both workflows, `.gitignore`, `.detect-secrets.baseline`, and the since-removed `real_examples/test_app` files. External sources were also read in full: terrappy's `tfc-test-helper-module-plan.yaml@v1` and `tfc-test-helper-module-apply.yaml@v1`, release-workflows' `github-release-tag.yaml@v2`, and the ElastiCache module blocks of all three consumers. Release-workflows' merge, dry-run and test workflows were characterised by name only. Version-handling expressions were evaluated in `terraform console` (Terraform 1.6.1), Redis TLS support was checked against the AWS in-transit encryption guide and provider PR #49114 (released in 6.62.0). The provider docs between 5.95.0 and 6.62.0 wrongly said standalone Redis clusters support TLS, so do not rely on those versions' docs. AWS parameter-group family names (`redis6.x`, `redis5.0`) come from AWS documentation and were not queried or applied live. Confidence stays `low` because no human has validated this draft.
